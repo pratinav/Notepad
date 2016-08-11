@@ -1,4 +1,7 @@
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.PrintWriter;
+import java.io.FileWriter;
 
 /**
  * File IO Handling library
@@ -7,7 +10,7 @@ public class IO {
   /**
    * Returns file contents
    * @param path  path of file
-   * @return    String with file data
+   * @return      String with file data
    */
   public static String read(String path) {
     String data = "";
@@ -23,7 +26,7 @@ public class IO {
           else data += "\n";
       }
       f.close();
-    } catch(IOException e) {}
+    } catch(Exception e) {}
     return data;
   }
 
@@ -37,6 +40,6 @@ public class IO {
       PrintWriter f = new PrintWriter(new FileWriter(path));
       f.println(data);
       f.close();
-    } catch (IOException e) {}
+    } catch (Exception e) {}
   }
 }

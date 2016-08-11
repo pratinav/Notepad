@@ -1,59 +1,88 @@
-import javax.swing.*;
-import javax.swing.event.*;
-import javax.swing.undo.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.io.*;
+import javax.swing.JFrame;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.JLabel;
+import javax.swing.JFileChooser;
+import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JMenuBar;
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JScrollPane;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
+import javax.swing.JDialog;
+import javax.swing.KeyStroke;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.CaretListener;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.undo.UndoManager;
+import java.awt.GraphicsEnvironment;
+import java.awt.Font;
+import java.awt.BorderLayout;
+import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.awt.event.KeyEvent;
+import java.io.BufferedReader;
+import java.io.File;
 import java.util.Arrays;
 
 /**
  * Notepad: A simple text editor
  * 
  * @author  Pratinav Bagla
- * @version v1.0.0
+ * @version v1.1.0
  *
  * Copyright (c) 2016 Pratinav Bagla (https://pratinav.xyz/)
  * Released under The MIT License (https://github.com/pratinav/notepad/blob/master/LICENSE)
  */
 public class Main extends JFrame implements ActionListener, DocumentListener, CaretListener, UndoableEditListener {
-  private IO io = new IO();
+  private final IO io = new IO();
   private JTextArea textArea;
   private JLabel statusBar;
   private JMenuItem undo, redo;
-  private JFileChooser fileChooser = new JFileChooser();
+  private final JFileChooser fileChooser = new JFileChooser();
 
-  private String[] fonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
-  private String[] styleNames = {"Plain", "Bold", "Italic", "Bold Italic"};
-  private int[] styleValues = {Font.PLAIN, Font.BOLD, Font.ITALIC, Font.BOLD + Font.ITALIC};
-
-  private boolean isNewFile = true;
-  private boolean isFileSaved = false;
+  private final String[] fonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+  private final String[] styleNames = {"Plain", "Bold", "Italic", "Bold Italic"};
+  private final int[] styleValues = {Font.PLAIN, Font.BOLD, Font.ITALIC, Font.BOLD + Font.ITALIC};
   private String currentFontFamily = "Lucida Console";
   private int currentFontStyle = Font.PLAIN;
   private String currentFontStyleName = "Plain";
   private int currentFontSize = 14;
+
+  private boolean isNewFile = true;
+  private boolean isFileSaved = false;
   private File currentFile;
   private String currentFilePath;
 
-  private UndoManager undoManager = new UndoManager();
+  private final UndoManager undoManager = new UndoManager();
 
   /**
-   * Constructor
+   * Class constructor
    */
   public Main() {
     init();
   }
 
+  /**
+   * Class constructor when file is specified
+   * @param file  File to be opened
+   */
   public Main(File file) {
     init();
-    loadFile(file);
+    openFile(file);
   }
 
   /**
-   * Builds GUI components
+   * Init method, builds GUI components
    */
   private void init() {
-    // Executes before closing
+    // Executes before window closes
     addWindowListener(new WindowAdapter() {
         public void windowClosing(WindowEvent e) {
           if (isFileSaved || confirmClose()) dispose();
@@ -84,6 +113,9 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
 
     JMenuItem print = createMenuItem("Print", "print", KeyEvent.VK_P, "ctrl P");
     file.add(print);
+    
+    JMenuItem exit = createMenuItem("Exit", "exit", KeyEvent.VK_E, "ctrl W");
+    file.add(exit);
 
     menuBar.add(file);
 
@@ -158,13 +190,127 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
   }
 
   /**
+   * Opens file
+   */
+  public void openFile() {
+    int returnVal = fileChooser.showOpenDialog(this);
+    if (returnVal == JFileChooser.APPROVE_OPTION) {
+      File file = fileChooser.getSelectedFile();
+      if(isNewFileEmpty()) openFile(file);
+      else new Main(file);
+    }
+  }
+
+  /**
+   * Opens specified file directly
+   * @param file  File to be loaded
+   */
+  public void openFile(File file) {
+    currentFile = file;
+    currentFilePath = currentFile.getPath();
+    String fileData = io.read(currentFilePath);
+    textArea.setText(fileData);
+    undo.setEnabled(false);
+    redo.setEnabled(false);
+    isNewFile = false;
+    isFileSaved = true;
+    setTitle(currentFile.getName());
+  }
+
+  /**
+   * Saves file at existing location
+   */
+  public void saveFile() {
+    if (isNewFile) saveFileAs();
+    else if (!isFileSaved) {
+      io.write(currentFilePath, textArea.getText());
+      isFileSaved = true;
+    }
+  }
+
+  /**
+   * Saves file at new location
+   * @return  True if successfull, false if user cancels
+   */
+  public boolean saveFileAs() {
+    File file;
+    while(true) {
+      if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+        file = fileChooser.getSelectedFile();
+        if (!file.exists()) break;
+        if (JOptionPane.showConfirmDialog(this, "Replace file?", "Save as", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) break;
+      } else return false;
+    }
+    currentFile = file;
+    currentFilePath = file.getPath();
+    isNewFile = false;
+    isFileSaved = false;
+    setTitle(currentFile.getName());
+    saveFile();
+    return true;
+  }
+
+  /**
+   * Prints file
+   */
+  public void printFile() {
+    if (!(textArea.getText().trim().equals("") && JOptionPane.showConfirmDialog(
+        this,
+        "File is empty, print anyway?", "Print",
+        JOptionPane.YES_NO_OPTION
+      ) == JOptionPane.NO_OPTION)) {
+      try {
+        textArea.print();
+      } catch (Exception pe) {}
+    }
+  }
+
+  /**
+   * Sets font from user
+   */
+  public void setFont() {
+    int currentFontFamilyIndex = Arrays.asList(fonts).indexOf(currentFontFamily);
+    int currentFontStyleIndex = Arrays.asList(styleNames).indexOf(currentFontStyleName);
+    Font font;
+
+    JDialog dialog = new JDialog(this, "Select font");
+    dialog.setLayout(new BorderLayout(0, 5));
+
+    JComboBox fontBox = new JComboBox(fonts);
+    fontBox.setSelectedIndex(currentFontFamilyIndex);
+    fontBox.setActionCommand("sampleFontFamily");
+    fontBox.addActionListener(this);
+    dialog.add(fontBox, BorderLayout.PAGE_START);
+
+    JComboBox styleBox = new JComboBox(styleNames);
+    styleBox.setSelectedIndex(currentFontStyleIndex);
+    styleBox.setActionCommand("sampleFontStyle");
+    styleBox.addActionListener(this);
+    dialog.add(styleBox, BorderLayout.CENTER);
+
+    JTextField fontSizeInput = new JTextField(Integer.toString(currentFontSize));
+    fontSizeInput.getDocument().putProperty("owner", fontSizeInput);
+    fontSizeInput.getDocument().addDocumentListener(this);
+    dialog.add(fontSizeInput, BorderLayout.LINE_END);
+
+    dialog.pack();
+    dialog.setVisible(true);
+  }
+  
+  // Implemented methods begin
+  
+  /**
    * Handles all action events
-   * @param e Action Event
+   * @param e  Action Event
    */
   public void actionPerformed(ActionEvent e) {
     String command = e.getActionCommand();
-
+ 
     switch(command) {
+      case "exit":
+      if (isFileSaved || confirmClose()) dispose();
+      break;
+      
       case "undo":
       try {
         undoManager.undo();
@@ -262,116 +408,30 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
       break;
     }
   }
-
+  
   /**
-   * Opens file
+   * Document Listener, called when content is inserted into text area or field
    */
-  public void openFile() {
-    int returnVal = fileChooser.showOpenDialog(this);
-    if (returnVal == JFileChooser.APPROVE_OPTION) {
-      File file = fileChooser.getSelectedFile();
-      if(isNewFileEmpty()) loadFile(file);
-      else new Main(file);
-    }
+  public void insertUpdate(DocumentEvent e) {
+    if (e.getDocument() == textArea.getDocument()) onAreaChange();
+    else onSampleChange(e.getDocument().getProperty("owner"));
   }
 
   /**
-   * Loads file
+   * Document Listener, called when content is removed from text area or field
    */
-  public void loadFile(File file) {
-    currentFile = file;
-    currentFilePath = currentFile.getPath();
-    String fileData = io.read(currentFilePath);
-    textArea.setText(fileData);
-    undo.setEnabled(false);
-    redo.setEnabled(false);
-    isNewFile = false;
-    isFileSaved = true;
-    setTitle(currentFile.getName());
+  public void removeUpdate(DocumentEvent e) {
+    if (e.getDocument() == textArea.getDocument()) onAreaChange();
+    else onSampleChange(e.getDocument().getProperty("owner"));
   }
 
   /**
-   * Saves file at existing location
+   * Document Listener, called when content style is changed in text area or field
    */
-  public void saveFile() {
-    if (isNewFile) saveFileAs();
-    else if (!isFileSaved) {
-      io.write(currentFilePath, textArea.getText());
-      isFileSaved = true;
-    }
-  }
+  public void changedUpdate(DocumentEvent e) {}
 
   /**
-   * Saves file at new location
-   * @return  True if successfull, false if user cancels
-   */
-  public boolean saveFileAs() {
-    File file;
-    while(true) {
-      if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-        file = fileChooser.getSelectedFile();
-        if (!file.exists()) break;
-        if (JOptionPane.showConfirmDialog(this, "Replace file?", "Save as", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) break;
-      } else return false;
-    }
-    currentFile = file;
-    currentFilePath = file.getPath();
-    isNewFile = false;
-    isFileSaved = false;
-    setTitle(currentFile.getName());
-    saveFile();
-    return true;
-  }
-
-  /**
-   * Prints file
-   */
-  public void printFile() {
-    if (!(textArea.getText().trim().equals("") && JOptionPane.showConfirmDialog(
-        this,
-        "File is empty, print anyway?", "Print",
-        JOptionPane.YES_NO_OPTION
-      ) == JOptionPane.NO_OPTION)) {
-      try {
-        textArea.print();
-      } catch (Exception pe) {}
-    }
-  }
-
-  /**
-   * Sets font from user
-   */
-  public void setFont() {
-    int currentFontFamilyIndex = Arrays.asList(fonts).indexOf(currentFontFamily);
-    int currentFontStyleIndex = Arrays.asList(styleNames).indexOf(currentFontStyleName);
-    Font font;
-
-    JDialog dialog = new JDialog(this, "Select font");
-    dialog.setLayout(new BorderLayout(0, 5));
-
-    JComboBox fontBox = new JComboBox(fonts);
-    fontBox.setSelectedIndex(currentFontFamilyIndex);
-    fontBox.setActionCommand("sampleFontFamily");
-    fontBox.addActionListener(this);
-    dialog.add(fontBox, BorderLayout.PAGE_START);
-
-    JComboBox styleBox = new JComboBox(styleNames);
-    styleBox.setSelectedIndex(currentFontStyleIndex);
-    styleBox.setActionCommand("sampleFontStyle");
-    styleBox.addActionListener(this);
-    dialog.add(styleBox, BorderLayout.CENTER);
-
-    JTextField fontSizeInput = new JTextField(Integer.toString(currentFontSize));
-    fontSizeInput.getDocument().putProperty("owner", fontSizeInput);
-    fontSizeInput.getDocument().addDocumentListener(this);
-    dialog.add(fontSizeInput, BorderLayout.LINE_END);
-
-    dialog.pack();
-    dialog.setVisible(true);
-  }
-
-  /**
-   * Caret listeners
+   * Caret listener, called when caret position changes in text area or field
    */
   public void caretUpdate(CaretEvent e) {
     int line = 1;
@@ -383,9 +443,19 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
     } catch (Exception ex) {}
     statusBar.setText("Line " + line + ", Column " + col + " ");
   }
+  
+  /**
+   * Undoable Edit listener
+   */
+  public void undoableEditHappened(UndoableEditEvent e) {
+    undoManager.addEdit(e.getEdit());
+    updateUndoItems();
+  }
+  
+  // Helper functions begin
 
   /**
-   * Document listeners
+   * Called on change in font size input
    */
   private void onSampleChange(Object source) {
     JTextField sizeInput = (JTextField) source;
@@ -397,28 +467,11 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
     textArea.setFont(new Font(currentFontFamily, currentFontStyle, currentFontSize));
   }
 
+  /**
+   * Called on change in main text area
+   */
   private void onAreaChange() {
     if (isFileSaved) isFileSaved = false;
-  }
-
-  public void insertUpdate(DocumentEvent e) {
-    if (e.getDocument() == textArea.getDocument()) onAreaChange();
-    else onSampleChange(e.getDocument().getProperty("owner"));
-  }
-
-  public void removeUpdate(DocumentEvent e) {
-    if (e.getDocument() == textArea.getDocument()) onAreaChange();
-    else onSampleChange(e.getDocument().getProperty("owner"));
-  }
-
-  public void changedUpdate(DocumentEvent e) {}
-
-  /**
-   * Undoable Edit listener
-   */
-  public void undoableEditHappened(UndoableEditEvent e) {
-    undoManager.addEdit(e.getEdit());
-    updateUndoItems();
   }
 
   /**
@@ -459,6 +512,7 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
 
   /**
    * Creates a new menu item
+   * @return  A JMenuItem with the specified config
    */
   private JMenuItem createMenuItem(String content, String actionCommand, int mnemonic, String accelerator) {
     JMenuItem item = new JMenuItem(content, mnemonic);
@@ -468,6 +522,10 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
     return item;
   }
 
+  /**
+   * Creates a new menu item without an accelerator
+   * @return  A JMenuItem with the specified config
+   */
   private JMenuItem createMenuItem(String content, String actionCommand, int mnemonic) {
     JMenuItem item = new JMenuItem(content, mnemonic);
     item.setActionCommand(actionCommand);
@@ -477,6 +535,7 @@ public class Main extends JFrame implements ActionListener, DocumentListener, Ca
 
   /**
    * Creates a new checkbox menu item
+   * @return  A JCheckBoxMenuItem with the specified config
    */
   private JCheckBoxMenuItem createMenuCheckbox(String content, String actionCommand, int mnemonic, String accelerator) {
     JCheckBoxMenuItem checkbox = new JCheckBoxMenuItem(content);
