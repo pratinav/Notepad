@@ -1,7 +1,7 @@
 # Notepad
-A simple notepad application written in Java
 
-# License
-Copyright (c) 2016 [Pratinav Bagla](https://pratinav.xyz/)
+A simple GUI-based notepad application written in Java.
+
+## License
 
 Released under [The MIT License](https://github.com/pratinav/notepad/blob/master/LICENSE)

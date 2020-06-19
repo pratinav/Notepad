@@ -37,7 +37,7 @@ import java.util.Arrays;
  * @author  Pratinav Bagla
  * @version v1.1.0
  *
- * Copyright (c) 2016 Pratinav Bagla (https://pratinav.xyz/)
+ * Copyright (c) 2016 Pratinav Bagla (https://www.pratinavbagla.com/)
  * Released under The MIT License (https://github.com/pratinav/notepad/blob/master/LICENSE)
  */
 public class Main extends JFrame implements ActionListener, DocumentListener, CaretListener, UndoableEditListener {
